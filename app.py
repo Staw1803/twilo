@@ -56,7 +56,7 @@ def process():
     try:
         # Chamada para o Llama 3 da Groq (Livre de bloqueios de IP)
         completion = groq_client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "user", "content": f"Responda em português, de forma muito curta, direta e prática: {user_speech}"}
             ]
