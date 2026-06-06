@@ -40,7 +40,7 @@ def consultar_mapa_manaus(local_texto):
 
 @app.route("/")
 def home():
-    return "Arbo com Cérebro Peso Pesado Ativo no Render!"
+    return "Arbo com Sistema de Redundância Ativo no Render!"
 
 # 1. O DISPARADOR
 @app.route("/trigger", methods=['GET', 'POST'])
@@ -65,7 +65,7 @@ def voice():
     gather.say("Arbo sistema online. Pode falar, estou te ouvindo.", language='pt-BR', voice="Polly.Vitoria")
     return str(response), 200, {'Content-Type': 'text/xml'}
 
-# 3. O CÉREBRO PESO PESADO (70B) COM MAPA INTEGRADO
+# 3. O CÉREBRO COM REDUNDÂNCIA AUTOMÁTICA
 @app.route("/process", methods=['GET', 'POST'])
 def process():
     user_speech = request.form.get('SpeechResult')
@@ -84,7 +84,7 @@ def process():
 
     contexto_mapa = ""
     try:
-        # Modelo rápido (8b) apenas para extrair a localização do texto em milissegundos
+        # Extração rápida de localização usando o modelo veloz
         extracao = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
@@ -101,35 +101,47 @@ def process():
     except Exception as e:
         print(f"[ERRO AGENTE EXTRAÇÃO] {e}", file=sys.stderr)
 
+    # Definição das diretrizes da IA
+    prompt_sistema = (
+        "Você é o copiloto de inteligência avançada do ecossistema Arbo. Seu objetivo é ajudar o usuário "
+        "em absolutamente tudo o que ele precisar, agindo com máxima sabedoria, raciocínio lógico aguçado e parceria. "
+        "O usuário está na cidade de MANAUS, AMAZONAS. Use os dados geográficos reais anexados à pergunta para se guiar. "
+        "Converse de forma natural, fluida e inteligente. Se a pergunta dele exigir uma resposta complexa, explique "
+        "de forma clara, mas direta e resumida (máximo de 3 frases) para ficar bom de ouvir pelo telefone."
+    )
+
+    ia_resposta = ""
     try:
-        # UPGRADE CRÍTICO: Agora rodando o Llama 3.3 70B para respostas extremamente inteligentes
+        # TENTATIVA 1: Modelo Peso Pesado Correto (70B)
         completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-specdec",
+            model="llama-3.3-70b-versatile",
             messages=[
-                {
-                    "role": "system", 
-                    "content": (
-                        "Você é o copiloto de inteligência avançada do ecossistema Arbo. Seu objetivo é ajudar o usuário "
-                        "em absolutamente tudo o que ele precisar, agindo com máxima sabedoria, raciocínio lógico aguçado e parceria. "
-                        "O usuário está na cidade de MANAUS, AMAZONAS. Use os dados geográficos reais anexados à pergunta para se guiar. "
-                        "Converse de forma natural, fluida e inteligente. Se a pergunta dele exigir uma resposta complexa, explique "
-                        "de forma clara, mas direta e resumida (máximo de 3 frases) para ficar bom de ouvir pelo telefone."
-                    )
-                },
-                {
-                    "role": "user", 
-                    "content": f"{user_speech} {contexto_mapa}"
-                }
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": f"{user_speech} {contexto_mapa}"}
             ],
             temperature=0.4,
             max_tokens=250
         )
         ia_resposta = completion.choices[0].message.content
-    except Exception as e:
-        print(f"[ERRO GROQ 70B] {e}", file=sys.stderr)
-        ia_resposta = "Deu um pequeno estalo na linha. Pode repetir com outros termos?"
+    except Exception as e70b:
+        print(f"[SISTEMA] Recuando para o modelo 8B devido ao erro: {e70b}", file=sys.stderr)
+        try:
+            # TENTATIVA 2 (FALLBACK): O modelo 8B assume se o grande falhar
+            completion = groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role": "system", "content": prompt_sistema},
+                    {"role": "user", "content": f"{user_speech} {contexto_mapa}"}
+                ],
+                temperature=0.3,
+                max_tokens=200
+            )
+            ia_resposta = completion.choices[0].message.content
+        except Exception as e8b:
+            print(f"[ERRO CRÍTICO] Falha total nas duas IAs: {e8b}", file=sys.stderr)
+            ia_resposta = "Tive um pequeno apagão nas linhas de processamento. Pode repetir o que disse?"
 
-    # Interrupção ativa e fala da Vitória
+    # Interrupção ativa e voz da Vitória
     gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
     gather.say(ia_resposta, language='pt-BR', voice="Polly.Vitoria")
     
