@@ -11,7 +11,7 @@ ACCOUNT_SID = 'ACa290536a8629089fbebd1d00faa9f605'
 AUTH_TOKEN = 'd7267c4849fc1f1ea1a96e2283553f42'
 NUMERO_TWILIO = '+16189964461'
 MEU_NUMERO_CELULAR = '+5592981233982'
-GROQ_API_KEY = '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'  # Garanta que sua chave gsk_ atual esteja aqui
+GROQ_API_KEY = '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'  # Garanta que sua chave gsk_ atual esteja aqui
 
 # Inicialização dos Clientes
 client = Client(ACCOUNT_SID, AUTH_TOKEN)
