@@ -12,7 +12,7 @@ ACCOUNT_SID = 'ACa290536a8629089fbebd1d00faa9f605'
 AUTH_TOKEN = 'd7267c4849fc1f1ea1a96e2283553f42'
 NUMERO_TWILIO = '+16189964461'
 MEU_NUMERO_CELULAR = '+5592981233982'
-GROQ_API_KEY = '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' # Sua chave ativa do Groq
+GROQ_API_KEY = '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' # Garanta que sua chave gsk_ real esteja aqui
 
 # Inicialização dos Clientes
 client = Client(ACCOUNT_SID, AUTH_TOKEN)
@@ -40,7 +40,7 @@ def consultar_mapa_manaus(local_texto):
 
 @app.route("/")
 def home():
-    return "Arbo Sistema Geográfico Ativo no Render!"
+    return "Arbo com Cérebro Peso Pesado Ativo no Render!"
 
 # 1. O DISPARADOR
 @app.route("/trigger", methods=['GET', 'POST'])
@@ -65,7 +65,7 @@ def voice():
     gather.say("Arbo sistema online. Pode falar, estou te ouvindo.", language='pt-BR', voice="Polly.Vitoria")
     return str(response), 200, {'Content-Type': 'text/xml'}
 
-# 3. O CÉREBRO COM CONSULTA EM API DE MAPAS
+# 3. O CÉREBRO PESO PESADO (70B) COM MAPA INTEGRADO
 @app.route("/process", methods=['GET', 'POST'])
 def process():
     user_speech = request.form.get('SpeechResult')
@@ -84,7 +84,7 @@ def process():
 
     contexto_mapa = ""
     try:
-        # PASSO 1: Passo ultra rápido pela IA para extrair se há locais na frase
+        # Modelo rápido (8b) apenas para extrair a localização do texto em milissegundos
         extracao = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
@@ -96,24 +96,24 @@ def process():
         )
         local_detectado = extracao.choices[0].message.content.strip()
         
-        # PASSO 2: Se ela achou um local, nós batemos na API de mapas real
         if "NENHUM" not in local_detectado.upper() and len(local_detectado) > 2:
-            print(f"[MAPA LOG] Buscando coordenadas para: {local_detectado}", file=sys.stderr)
             contexto_mapa = consultar_mapa_manaus(local_detectado)
     except Exception as e:
         print(f"[ERRO AGENTE EXTRAÇÃO] {e}", file=sys.stderr)
 
     try:
-        # PASSO 3: Resposta final combinando a pergunta do usuário com o dado real da API de Mapas
+        # UPGRADE CRÍTICO: Agora rodando o Llama 3.3 70B para respostas extremamente inteligentes
         completion = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-specdec",
             messages=[
                 {
                     "role": "system", 
                     "content": (
-                        "Você é o copiloto de inteligência do sistema Arbo. O usuário está em MANAUS, AMAZONAS. "
-                        "Use as informações reais fornecidas pela API de mapas anexadas à pergunta para se orientar geograficamente. "
-                        "Seja extremamente inteligente, natural e prestativo. Responda de forma curta, conversacional e direta (máximo duas frases)."
+                        "Você é o copiloto de inteligência avançada do ecossistema Arbo. Seu objetivo é ajudar o usuário "
+                        "em absolutamente tudo o que ele precisar, agindo com máxima sabedoria, raciocínio lógico aguçado e parceria. "
+                        "O usuário está na cidade de MANAUS, AMAZONAS. Use os dados geográficos reais anexados à pergunta para se guiar. "
+                        "Converse de forma natural, fluida e inteligente. Se a pergunta dele exigir uma resposta complexa, explique "
+                        "de forma clara, mas direta e resumida (máximo de 3 frases) para ficar bom de ouvir pelo telefone."
                     )
                 },
                 {
@@ -121,15 +121,15 @@ def process():
                     "content": f"{user_speech} {contexto_mapa}"
                 }
             ],
-            temperature=0.2,
-            max_tokens=200
+            temperature=0.4,
+            max_tokens=250
         )
         ia_resposta = completion.choices[0].message.content
     except Exception as e:
-        print(f"[ERRO GROQ FINAL] {e}", file=sys.stderr)
-        ia_resposta = "Deu um pequeno estalo na linha. Pode repetir?"
+        print(f"[ERRO GROQ 70B] {e}", file=sys.stderr)
+        ia_resposta = "Deu um pequeno estalo na linha. Pode repetir com outros termos?"
 
-    # Vitória fala com os dados blindados da API de mapas
+    # Interrupção ativa e fala da Vitória
     gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
     gather.say(ia_resposta, language='pt-BR', voice="Polly.Vitoria")
     
