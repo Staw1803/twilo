@@ -3,3 +3,4 @@ twilio
 groq
 gunicorn
 requests
+duckduckgo_search
