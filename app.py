@@ -11,7 +11,7 @@ ACCOUNT_SID = 'ACa290536a8629089fbebd1d00faa9f605'
 AUTH_TOKEN = 'd7267c4849fc1f1ea1a96e2283553f42'
 NUMERO_TWILIO = '+16189964461'
 MEU_NUMERO_CELULAR = '+5592981233982'
-GROQ_API_KEY = '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'  # Garanta que sua chave gsk_ atual esteja aqui
+GROQ_API_KEY = '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' # Sua chave ativa do Groq
 
 # Inicialização dos Clientes
 client = Client(ACCOUNT_SID, AUTH_TOKEN)
@@ -19,7 +19,7 @@ groq_client = Groq(api_key=GROQ_API_KEY)
 
 @app.route("/")
 def home():
-    return "Arbo Sistema Online no Render com Groq e Loop Ativo!"
+    return "Arbo Assistente Conversacional Ativo no Render!"
 
 # 1. O DISPARADOR
 @app.route("/trigger", methods=['GET', 'POST'])
@@ -40,44 +40,64 @@ def trigger_call():
 def voice():
     response = VoiceResponse()
     LINK_PROCESS = 'https://twilo-eqee.onrender.com/process'
+    
+    # Microfone aberto desde o segundo zero
     gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
-    gather.say("Arbo sistema online. Estou te ouvindo.", language='pt-BR', voice="Polly.Vitoria")
+    gather.say("Arbo sistema online. Pode falar, estou te ouvindo.", language='pt-BR', voice="Polly.Vitoria")
     return str(response), 200, {'Content-Type': 'text/xml'}
 
-# 3. O CÉREBRO COM LOOP INTELLIGENTE
+# 3. O CÉREBRO COOPERATIVO E INTERRUPTÍVEL
 @app.route("/process", methods=['GET', 'POST'])
 def process():
     user_speech = request.form.get('SpeechResult')
-    if not user_speech:
-        user_speech = "Alô"
-
     response = VoiceResponse()
     LINK_PROCESS = 'https://twilo-eqee.onrender.com/process'
 
-    # CONDIÇÃO DE DESLIGAMENTO (Engenharia Reversa de Comando)
+    # Se houver silêncio ou falha na captação, reabre o microfone direto sem desligar
+    if not user_speech:
+        gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
+        return str(response), 200, {'Content-Type': 'text/xml'}
+
+    # CONDIÇÃO DE DESLIGAMENTO EXPRESSA
     fala_usuario = user_speech.lower()
-    if "pode desligar" in fala_usuario or "tchau" in fala_usuario or "desliga" in fala_usuario:
-        response.say("Entendido. Encerrando o sistema Arbo. Até logo!", language='pt-BR', voice="Polly.Vitoria")
-        response.hangup()  # Força o Twilio a bater o telefone
+    if any(cmd in fala_usuario for cmd in ["pode desligar", "tchau", "desliga", "encerrar a chamada"]):
+        response.say("Entendido. Fechando conexão. Até mais!", language='pt-BR', voice="Polly.Vitoria")
+        response.hangup()
         return str(response), 200, {'Content-Type': 'text/xml'}
 
     try:
-        # Chamada para o Llama 3.1 da Groq
+        # Prompt modelado para inteligência contextual avançada e questionamento ativo
         completion = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "user", "content": f"Responda em português, de forma muito curta, direta e prática: {user_speech}"}
-            ]
+                {
+                    "role": "system", 
+                    "content": (
+                        "Você é o copiloto de inteligência do ecossistema Arbo. Seu objetivo é ajudar o usuário "
+                        "em absolutamente tudo o que ele precisar, agindo com extrema inteligência, clareza e parceria. "
+                        "Aja como em uma conversa natural de telefone: compreenda a fundo o que ele quer dizer. "
+                        "Se a pergunta dele for vaga ou se você precisar de mais detalhes para dar a resposta perfeita, "
+                        "não tente adivinhar ou inventar caminhos malucos; em vez disso, responda com o que sabe e faça "
+                        "uma pergunta inteligente de volta para guiar o papo. Mantenha as falas dinâmicas, fluidas e sem enrolação."
+                    )
+                },
+                {
+                    "role": "user", 
+                    "content": user_speech
+                }
+            ],
+            temperature=0.4, # Equilíbrio perfeito entre foco e capacidade de diálogo
+            max_tokens=200
         )
         ia_resposta = completion.choices[0].message.content
     except Exception as e:
         print(f"[ERRO GROQ] {e}", file=sys.stderr)
-        ia_resposta = f"Erro na IA. Detalhe: {str(e)[:50]}"
+        ia_resposta = "Deu um pequeno estalo na linha. Pode repetir o que falou?"
 
-    # 1. A Vitória fala a resposta da Inteligência Artificial
-    response.say(ia_resposta, language='pt-BR', voice="Polly.Vitoria")
-    
-    # 2. MÁGICA DO LOOP: Logo após falar, ela já reabre o microfone esperando a próxima pergunta!
-    response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
+    # MÁGICA DA INTERRUPÇÃO AUTOMÁTICA: 
+    # Ao envelopar o .say() dentro do .gather(), a Vitória começa a falar a resposta da IA,
+    # mas se você começar a falar por cima, o Twilio corta o áudio dela na hora e processa sua nova fala!
+    gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
+    gather.say(ia_resposta, language='pt-BR', voice="Polly.Vitoria")
     
     return str(response), 200, {'Content-Type': 'text/xml'}
