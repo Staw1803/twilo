@@ -70,7 +70,7 @@ def voice():
     gather.say("Arbo sistema online. Pode falar, estou te ouvindo.", language='pt-BR', voice="Polly.Vitoria")
     return str(response), 200, {'Content-Type': 'text/xml'}
 
-# 3. O CÉREBRO CONECTADO À WEB COM REDUNDÂNCIA
+# 3. O CÉREBRO CONECTADO À WEB COM REDUNDÂNCIA E INDENTAÇÃO CORRIGIDA
 @app.route("/process", methods=['GET', 'POST'])
 def process():
     user_speech = request.form.get('SpeechResult')
@@ -119,13 +119,12 @@ def process():
     except Exception as e:
         print(f"[ERRO ANALISADOR PREVIO] {e}", file=sys.stderr)
 
-    # Diretrizes Soberanas da IA (Ciente do Tempo Real e do Ano Atual de 2026)
-   prompt_sistema = (
+    # Diretrizes Soberanas da IA (Forçando o uso dos dados injetados e com alinhamento de blocos perfeito)
+    prompt_sistema = (
         "Você é o copiloto de inteligência avançada do ecossistema Arbo. O ano atual é 2026 e o usuário está em Manaus, Amazonas. "
         "ATENÇÃO: Você TEM acesso à internet através dos dados anexados à pergunta. Nunca diga que não tem acesso em tempo real. "
         "Se houver informações da internet no texto abaixo, use-as como sua memória atual para responder sobre clima, notícias ou eventos. "
         "Seja extremamente curto, direto e conversacional (máximo 2 a 3 frases)."
-    ) (máximo de 3 frases)."
     )
 
     ia_resposta = ""
