@@ -46,11 +46,14 @@ def process():
 
 # O DISPARADOR: Martelada a cada 2 minutos
 def loop_martelada():
+    # LINK OFICIAL DO SEU SERVIÇO NO RENDER
+    URL_PRODUCAO = 'https://twilo-eqee.onrender.com/voice'
+    
     while True:
         try:
             print("[STATUS] Disparando chamada...")
             client.calls.create(
-                url='https://arbo-jader.loca.lt/voice', 
+                url=URL_PRODUCAO, 
                 to=MEU_NUMERO_CELULAR,
                 from_=NUMERO_TWILIO,
                 timeout=60
@@ -58,7 +61,7 @@ def loop_martelada():
         except Exception as e:
             print(f"[ERRO TWILIO] {e}")
         
-        time.sleep(120) # 2 minutos
+        time.sleep(120)
 
 if __name__ == "__main__":
     # Espera 5 segundos para o túnel estabilizar antes de disparar
