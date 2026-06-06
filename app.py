@@ -6,7 +6,7 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# CONFIGURAÇÕES (Seus dados salvos)
+# CONFIGURAÇÕES (Seus dados consolidados e ativos)
 ACCOUNT_SID = 'ACa290536a8629089fbebd1d00faa9f605'
 AUTH_TOKEN = 'd7267c4849fc1f1ea1a96e2283553f42'
 NUMERO_TWILIO = '+16189964461'
@@ -20,30 +20,34 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 
 @app.route("/")
 def home():
-    return "Arbo Sistema Online no Render!"
+    return "Arbo Sistema Online no Render sem Bloqueios!"
 
+# 1. O DISPARADOR
 @app.route("/trigger", methods=['GET', 'POST'])
 def trigger_call():
     try:
-        # Nota: Ajustaremos este link assim que o Render gerar o seu link oficial
+        # ATUALIZADO COM O SEU LINK REAL DO RENDER
         client.calls.create(
-            url='https://link-do-seu-render.onrender.com/voice',
+            url='https://twilo-eqee.onrender.com/voice',
             to=MEU_NUMERO_CELULAR,
             from_=NUMERO_TWILIO,
             timeout=60
         )
-        return "Chamada disparada com sucesso!", 200
+        return "Chamada disparada com sucesso via Render!", 200
     except Exception as e:
         return f"Erro ao disparar: {e}", 500
 
+# 2. O ATENDIMENTO
 @app.route("/voice", methods=['GET', 'POST'])
 def voice():
     response = VoiceResponse()
-    LINK_PROCESS = 'https://link-do-seu-render.onrender.com/process'
+    # ATUALIZADO COM O SEU LINK REAL DO RENDER
+    LINK_PROCESS = 'https://twilo-eqee.onrender.com/process'
     gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
     gather.say("Arbo sistema online. Estou te ouvindo.", language='pt-BR', voice="Polly.Vitoria")
     return str(response), 200, {'Content-Type': 'text/xml'}
 
+# 3. O CÉREBRO
 @app.route("/process", methods=['GET', 'POST'])
 def process():
     user_speech = request.form.get('SpeechResult')
