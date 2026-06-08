@@ -17,7 +17,7 @@ MEU_NUMERO_CELULAR = '+5592981233982'
 GROQ_API_KEY = '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' # Sua chave ativa do Groq
 
 # CONFIGURAÇÕES SUPABASE (Substitua pelos seus dados reais do painel do Supabase)
-SUPABASE_URL = 'https://gzekubsjpcgrxgomoriy.supabase.co/rest/v1/'
+SUPABASE_URL = 'https://gzekubsjpcgrxgomoriy.supabase.co'
 SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6ZWt1YnNqcGNncnhnb21vcml5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzA3NDgsImV4cCI6MjA5NjQ0Njc0OH0.AxMl-aczglJgazwCyMZtQc191vVGjxhSiR98jUmBdAU'
 
 # Inicialização dos Clientes
