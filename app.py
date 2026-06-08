@@ -5,6 +5,7 @@ from twilio.rest import Client
 from groq import Groq
 import requests
 from duckduckgo_search import DDGS
+from supabase import create_client, Client as SupabaseClient
 
 app = Flask(__name__)
 
@@ -13,13 +14,17 @@ ACCOUNT_SID = 'ACa290536a8629089fbebd1d00faa9f605'
 AUTH_TOKEN = 'd7267c4849fc1f1ea1a96e2283553f42'
 NUMERO_TWILIO = '+16189964461'
 MEU_NUMERO_CELULAR = '+5592981233982'
-GROQ_API_KEY = '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' # Sua chave ativa do Groq
+GROQ_API_KEY = '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' # Sua chave ativa do Groq
+
+# CONFIGURAÇÕES SUPABASE (Substitua pelos seus dados reais do painel do Supabase)
+SUPABASE_URL = 'https://gzekubsjpcgrxgomoriy.supabase.co/rest/v1/'
+SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6ZWt1YnNqcGNncnhnb21vcml5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzA3NDgsImV4cCI6MjA5NjQ0Njc0OH0.AxMl-aczglJgazwCyMZtQc191vVGjxhSiR98jUmBdAU'
 
 # Inicialização dos Clientes
 client = Client(ACCOUNT_SID, AUTH_TOKEN)
 groq_client = Groq(api_key=GROQ_API_KEY)
+supabase: SupabaseClient = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# FUNÇÃO: Consulta a API de mapas para Manaus
 def consultar_mapa_manaus(local_texto):
     url = "https://nominatim.openstreetmap.org/search"
     headers = {'User-Agent': 'ArboAssistant/1.0 (jader@evo.com)'}
@@ -32,22 +37,20 @@ def consultar_mapa_manaus(local_texto):
         print(f"[ERRO MAPA] {e}", file=sys.stderr)
     return ""
 
-# FUNÇÃO: Faz a busca em tempo real na internet de graça
 def buscar_na_internet(termo_busca):
     try:
         with DDGS() as ddgs:
             resultados = [r['body'] for r in ddgs.text(termo_busca, max_results=2)]
             if resultados:
-                return f" [Dados em Tempo Real da Internet: {' | '.join(resultados)}]"
+                return f" [Internet: {' | '.join(resultados)}]"
     except Exception as e:
-        print(f"[ERRO BUSCA WEB] {e}", file=sys.stderr)
+        print(f"[ERRO BUSCA] {e}", file=sys.stderr)
     return ""
 
 @app.route("/")
 def home():
-    return "Arbo Sistema Conectado à Internet em Tempo Real!"
+    return "Olá Mestre! Oque deseja?"
 
-# 1. O DISPARADOR
 @app.route("/trigger", methods=['GET', 'POST'])
 def trigger_call():
     try:
@@ -57,20 +60,18 @@ def trigger_call():
             from_=NUMERO_TWILIO,
             timeout=60
         )
-        return "Chamada disparada com sucesso via Render!", 200
+        return "Chamada disparada!", 200
     except Exception as e:
-        return f"Erro ao disparar: {e}", 500
+        return f"Erro: {e}", 500
 
-# 2. O ATENDIMENTO INICIAL
 @app.route("/voice", methods=['GET', 'POST'])
 def voice():
     response = VoiceResponse()
     LINK_PROCESS = 'https://twilo-eqee.onrender.com/process'
     gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
-    gather.say("Arbo sistema online. Pode falar, estou te ouvindo.", language='pt-BR', voice="Polly.Vitoria")
+    gather.say("Arbo sistema online. Pode falar.", language='pt-BR', voice="Polly.Vitoria")
     return str(response), 200, {'Content-Type': 'text/xml'}
 
-# 3. O CÉREBRO CONECTADO À WEB COM REDUNDÂNCIA E INDENTAÇÃO CORRIGIDA
 @app.route("/process", methods=['GET', 'POST'])
 def process():
     user_speech = request.form.get('SpeechResult')
@@ -82,54 +83,75 @@ def process():
         return str(response), 200, {'Content-Type': 'text/xml'}
 
     fala_usuario = user_speech.lower()
-    if any(cmd in fala_usuario for cmd in ["pode desligar", "tchau", "desliga", "encerrar a chamada"]):
-        response.say("Entendido. Fechando conexão. Até mais!", language='pt-BR', voice="Polly.Vitoria")
+    if any(cmd in fala_usuario for cmd in ["pode desligar", "tchau", "desliga"]):
+        response.say("Conexão encerrada. Até logo!", language='pt-BR', voice="Polly.Vitoria")
         response.hangup()
         return str(response), 200, {'Content-Type': 'text/xml'}
 
     contexto_extra = ""
     try:
-        # PARSER DUPLO (8B): Extrai local do mapa E termo de busca na internet ao mesmo tempo
+        # PARSER TRIPLO (8B): Agora identifica intenção de WhatsApp, locais e buscas na web
         extracao = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system", 
-                    "content": "Você é um assistente de extração de dados. Responda ESTRITAMENTE no formato exato: LOCAL: [nome do lugar ou NENHUM] | BUSCA: [termo de pesquisa para internet sobre notícias, fatos atuais, clima, ou NENHUM]"
+                    "content": (
+                        "Você é um classificador de intenções. Responda ESTRITAMENTE no formato:\n"
+                        "WHATSAPP: [ENVIAR se o usuário quer mandar mensagem, LER se quer ver mensagens novas, ou NENHUM] | "
+                        "PARA: [nome do contato ou NENHUM] | TXT: [conteúdo da mensagem a ser enviada ou NENHUM] | "
+                        "LOCAL: [lugar citado ou NENHUM] | BUSCA: [termo para internet ou NENHUM]"
+                    )
                 },
                 {"role": "user", "content": user_speech}
             ],
             temperature=0.0,
-            max_tokens=60
+            max_tokens=100
         )
         dados_extraidos = extracao.choices[0].message.content.strip()
-        print(f"[SISTEMA LOG] Extração: {dados_extraidos}", file=sys.stderr)
+        print(f"[SISTEMA LOG] Parser: {dados_extraidos}", file=sys.stderr)
         
-        # Processando a resposta do extrator
-        if "LOCAL:" in dados_extraidos and "BUSCA:" in dados_extraidos:
-            partes = dados_extraidos.split("|")
-            loc = partes[0].replace("LOCAL:", "").strip()
-            bus = partes[1].replace("BUSCA:", "").strip()
+        # Quebrando as variáveis do parser
+        partes = {p.split(":")[0].strip(): p.split(":")[1].strip() for p in dados_extraidos.split("|") if ":" in p}
+        
+        # AÇÃO 1: Tratar Envio de WhatsApp (Salva no Supabase)
+        if partes.get("WHATSAPP") == "ENVIAR" and partes.get("PARA") != "NENHUM":
+            supabase.table("whatsapp_comandos").insert({
+                "destinatario": partes.get("PARA"),
+                "mensagem": partes.get("TXT")
+            }).execute()
+            contexto_extra += f" [Confirmação técnica: O comando de enviar mensagem para {partes.get('PARA')} foi registrado com sucesso no banco de dados para o computador de casa ler.]"
             
-            if "NENHUM" not in loc.upper() and len(loc) > 2:
-                contexto_extra += consultar_mapa_manaus(loc)
-            if "NENHUM" not in bus.upper() and len(bus) > 2:
-                contexto_extra += buscar_na_internet(bus)
+        # AÇÃO 2: Tratar Leitura de WhatsApp (Busca do Supabase)
+        elif partes.get("WHATSAPP") == "LER":
+            dados_msg = supabase.table("whatsapp_mensagens").select("*").eq("lida_por_usuario", False).order("recebido_em", desc=True).limit(3).execute()
+            if dados_msg.data:
+                resumo_msgs = " | ".join([f"De {m['remetente']}: {m['mensagem']}" for m in dados_msg.data])
+                contexto_extra += f" [Mensagens não lidas encontradas no WhatsApp de casa: {resumo_msgs}]"
+                # Marca como lidas
+                for m in dados_msg.data:
+                    supabase.table("whatsapp_mensagens").update({"lida_por_usuario": True}).eq("id", m["id"]).execute()
+            else:
+                contexto_extra += " [Não há nenhuma mensagem nova ou não lida no WhatsApp de casa no momento.]"
+
+        # AÇÃO 3: Mapas e Internet tradicionais
+        if partes.get("LOCAL") != "NENHUM":
+            contexto_extra += consultar_mapa_manaus(partes.get("LOCAL"))
+        if partes.get("BUSCA") != "NENHUM":
+            contexto_extra += buscar_na_internet(partes.get("BUSCA"))
                 
     except Exception as e:
-        print(f"[ERRO ANALISADOR PREVIO] {e}", file=sys.stderr)
+        print(f"[ERRO PARSER] {e}", file=sys.stderr)
 
-    # Diretrizes Soberanas da IA (Forçando o uso dos dados injetados e com alinhamento de blocos perfeito)
     prompt_sistema = (
         "Você é o copiloto de inteligência avançada do ecossistema Arbo. O ano atual é 2026 e o usuário está em Manaus, Amazonas. "
-        "ATENÇÃO: Você TEM acesso à internet através dos dados anexados à pergunta. Nunca diga que não tem acesso em tempo real. "
-        "Se houver informações da internet no texto abaixo, use-as como sua memória atual para responder sobre clima, notícias ou eventos. "
-        "Seja extremamente curto, direto e conversacional (máximo 2 a 3 frases)."
+        "Você é capaz de controlar o WhatsApp dele através dos comandos técnicos injetados no contexto. "
+        "Se o contexto confirmar que uma mensagem foi enviada, avise de forma natural e parceira. "
+        "Se houver mensagens recebidas do WhatsApp no contexto, relate-as para o usuário de forma clara. "
+        "Seja extremamente curto, direto e conversacional (máximo de 3 frases)."
     )
 
-    ia_resposta = ""
     try:
-        # TENTATIVA 1: Llama 3.3 70B com internet injetada
         completion = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
@@ -141,23 +163,8 @@ def process():
         )
         ia_resposta = completion.choices[0].message.content
     except Exception as e70b:
-        print(f"[SISTEMA] Recuando para o modelo 8B: {e70b}", file=sys.stderr)
-        try:
-            # FALLBACK: Llama 3.1 8B assume se o grande falhar
-            completion = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {"role": "system", "content": prompt_sistema},
-                    {"role": "user", "content": f"{user_speech} {contexto_extra}"}
-                ],
-                temperature=0.3,
-                max_tokens=200
-            )
-            ia_resposta = completion.choices[0].message.content
-        except Exception as e8b:
-            ia_resposta = "Tive um pequeno atraso na busca de dados. Pode repetir?"
+        ia_resposta = "Tive um pequeno atraso na ponte com o banco de dados. Pode repetir?"
 
-    # Interrupção ativa e voz da Vitória
     gather = response.gather(input='speech', action=LINK_PROCESS, language='pt-BR', speech_timeout='auto')
     gather.say(ia_resposta, language='pt-BR', voice="Polly.Vitoria")
     
