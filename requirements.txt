@@ -4,3 +4,4 @@ groq
 gunicorn
 requests
 duckduckgo_search
+supabase
