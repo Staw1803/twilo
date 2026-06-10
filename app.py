@@ -1,4 +1,7 @@
 import sys
+import threading
+import time
+import math
 from flask import Flask, request, jsonify
 from twilio.twiml.voice_response import VoiceResponse
 from twilio.rest import Client as TwilioClient
@@ -11,8 +14,11 @@ import vonage
 app = Flask(__name__)
 
 # =====================================================================
-# CONFIGURAÇÕES DO ECOSSISTEMA
+# CONFIGURAÇÕES DO ECOSSISTEMA (ALTERADO PARA RITMO ACELERADO)
 # =====================================================================
+ATIVAR_LIGACOES_AUTOMATICAS = True # Vira True para o loop rodar sozinho ao ligar o app
+INTERVALO_MINUTOS = 2              # Tempo entre o fim de uma chamada e o disparo da próxima
+TIMEOUT_SEGUNDOS = 7               # Janela estrita de 7 segundos para evitar a caixa postal
 
 # --- TWILIO ---
 TWILIO_SID = 'ACa290536a8629089fbebd1d00faa9f605'
@@ -72,19 +78,34 @@ try:
 except Exception as e:
     print(f"[AVISO VONAGE] Configurações pendentes: {e}", file=sys.stderr)
 
-# FERRAMENTA 1: GPS Manaus
-def consultar_mapa_manaus(local_texto):
-    url = "https://nominatim.openstreetmap.org/search"
-    params = {'q': f"{local_texto}, Manaus, Amazonas", 'format': 'json', 'limit': 1}
+def calcular_estimativa_transporte(destino_texto):
+    lat_origem, lon_origem = -3.1190275, -60.0217314 
+    url_busca = "https://nominatim.openstreetmap.org/search"
+    params = {'q': f"{destino_texto}, Manaus, Amazonas", 'format': 'json', 'limit': 1}
     try:
-        resp = requests.get(url, params=params, headers={'User-Agent': 'Arbo/1.0'}, timeout=4)
+        resp = requests.get(url_busca, params=params, headers={'User-Agent': 'AssistenteVoz/1.0'}, timeout=4)
         if resp.status_code == 200 and resp.json():
-            return f" [Mapa: {resp.json()[0].get('display_name', '')}]"
-    except:
-        pass
-    return " [Mapa: Local não encontrado com precisão]"
+            local_dados = resp.json()[0]
+            lat_destino = float(local_dados['lat'])
+            lon_destino = float(local_dados['lon'])
+            nome_completo = local_dados.get('display_name', '')
+            rad = math.pi / 180
+            dlat = (lat_destino - lat_origem) * rad
+            dlon = (lon_destino - lon_origem) * rad
+            a = math.sin(dlat/2)**2 + math.cos(lat_origem*rad) * math.cos(lat_destino*rad) * math.sin(dlon/2)**2
+            distancia_km = 2 * 6371 * math.asin(math.sqrt(a))
+            distancia_real_aprox = distancia_km * 1.3
+            tarifa_base = 4.50
+            custo_por_km = 2.10
+            tempo_estimado_minutos = distancia_real_aprox * 2.5 
+            custo_por_minuto = 0.25
+            preco_final = tarifa_base + (distancia_real_aprox * custo_por_km) + (tempo_estimado_minutos * custo_por_minuto)
+            if preco_final < 8.00: preco_final = 8.00
+            return f" [Transporte: Destino encontrado: {nome_completo}. Distância aprox: {distancia_real_aprox:.1f}km. Preço estimado UberX/99: R$ {preco_final:.2f}]"
+    except Exception as e:
+        print(f"[ERRO TRANSPORTE] {e}", file=sys.stderr)
+    return " [Transporte: Não foi possível calcular a rota para esse destino no momento]"
 
-# FERRAMENTA 2: Internet em Tempo Real
 def buscar_na_internet(termo_busca):
     try:
         with DDGS() as ddgs:
@@ -96,33 +117,47 @@ def buscar_na_internet(termo_busca):
     return " [Internet: Falha na busca]"
 
 # =====================================================================
-# ROTAS DE GATILHO E VOZ
+# ROTAS DO SERVIDOR WEB E DISPAROS
 # =====================================================================
-@app.route("/trigger", methods=['GET', 'POST'])
-def trigger_call():
+def disparar_ligacao_assistente():
     try:
-        client_twilio.calls.create(url='https://twilo-eqee.onrender.com/twilio/voice', to='+' + MEU_NUMERO_CELULAR, from_=NUMERO_TWILIO, timeout=60)
-        return "Chamada disparada via Twilio!", 200
+        # O parâmetro timeout define quantos segundos o Twilio deixa chamando antes de desistir
+        client_twilio.calls.create(
+            url='https://twilo-eqee.onrender.com/twilio/voice', 
+            to='+' + MEU_NUMERO_CELULAR, 
+            from_=NUMERO_TWILIO, 
+            timeout=TIMEOUT_SEGUNDOS
+        )
+        return "Chamada disparada via Twilio!"
     except Exception as e_twilio:
-        print(f"[FAILOVER] Twilio sem saldo. Erro: {e_twilio}. Tentando Vonage...", file=sys.stderr)
         try:
-            vonage_voice.create_call({'to': [{'type': 'phone', 'number': MEU_NUMERO_CELULAR}], 'from': {'type': 'phone', 'number': VONAGE_NUMERO_ORIGEM}, 'answer_url': ['https://twilo-eqee.onrender.com/vonage/voice']})
-            return "Chamada disparada via Vonage com sucesso!", 200
+            # O ringing_timer faz exatamente a mesma coisa na infraestrutura da Vonage
+            vonage_voice.create_call({
+                'to': [{'type': 'phone', 'number': MEU_NUMERO_CELULAR}], 
+                'from': {'type': 'phone', 'number': VONAGE_NUMERO_ORIGEM}, 
+                'answer_url': ['https://twilo-eqee.onrender.com/vonage/voice'], 
+                'ringing_timer': TIMEOUT_SEGUNDOS
+            })
+            return "Chamada disparada via Vonage!"
         except Exception as e_vonage:
-            return f"Erro Crítico nos dois provedores: {e_vonage}", 500
+            return f"Erro Crítico: {e_vonage}"
+
+@app.route("/trigger", methods=['GET', 'POST'])
+def trigger_call_route():
+    return disparar_ligacao_assistente(), 200
 
 @app.route("/twilio/voice", methods=['GET', 'POST'])
 def twilio_voice():
     response = VoiceResponse()
-    response.gather(input='speech', action='https://twilo-eqee.onrender.com/process?provider=twilio', language='pt-BR', speech_timeout='auto').say("Arbo online. Pode falar.", language='pt-BR', voice="Polly.Vitoria")
+    response.gather(input='speech', action='https://twilo-eqee.onrender.com/process?provider=twilio', language='pt-BR', speech_timeout='auto').say("Conexão estabelecida. Pode falar.", language='pt-BR', voice="Polly.Vitoria")
     return str(response), 200, {'Content-Type': 'text/xml'}
 
 @app.route("/vonage/voice", methods=['GET', 'POST'])
 def vonage_voice_input():
-    return jsonify([{"action": "talk", "text": "Arbo online. Pode falar.", "language": "pt-BR", "bargeIn": True}, {"action": "input", "type": ["speech"], "speech": {"language": "pt-BR", "endOnSilence": 1.5}, "eventUrl": ["https://twilo-eqee.onrender.com/process?provider=vonage"]}]), 200
+    return jsonify([{"action": "talk", "text": "Conexão estabelecida. Pode falar.", "language": "pt-BR", "bargeIn": True}, {"action": "input", "type": ["speech"], "speech": {"language": "pt-BR", "endOnSilence": 1.5}, "eventUrl": ["https://twilo-eqee.onrender.com/process?provider=vonage"]}]), 200
 
 # =====================================================================
-# O CÉREBRO UNIFICADO
+# O CÉREBRO UNIFICADO (PROCESSAMENTO DAS APIS)
 # =====================================================================
 @app.route("/process", methods=['GET', 'POST'])
 def process():
@@ -139,18 +174,17 @@ def process():
         return reabrir_microfone(provedor)
 
     fala_usuario = user_speech.lower()
-    if any(cmd in fala_usuario for cmd in ["desligar", "tchau", "desliga"]):
+    if any(cmd in fala_usuario for cmd in ["desligar", "tchau", "desliga", "encerrar"]):
         return encerrar_chamada(provedor)
 
     contexto_extra = ""
     try:
-        # PARSER DE INTENÇÕES (8B) - Agora detecta locais e buscas na internet
         extracao = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
                 {
                     "role": "system", 
-                    "content": "Responda ESTRITAMENTE: WHATSAPP: [ENVIAR ou NENHUM] | PARA: [nome ou NENHUM] | TXT: [mensagem ou NENHUM] | LOCAL: [Lugar em Manaus citado ou NENHUM] | BUSCA: [Assunto para pesquisar no google ou NENHUM]"
+                    "content": "Responda ESTRITAMENTE: WHATSAPP: [ENVIAR ou NENHUM] | PARA: [nome ou NENHUM] | TXT: [mensagem ou NENHUM] | UBER: [Nome do destino final ou NENHUM] | BUSCA: [Assunto para pesquisar na web ou NENHUM]"
                 },
                 {"role": "user", "content": user_speech}
             ],
@@ -160,30 +194,24 @@ def process():
         dados_extraidos = extracao.choices[0].message.content.strip()
         partes = {p.split(":")[0].strip(): p.split(":")[1].strip() for p in dados_extraidos.split("|") if ":" in p}
         
-        # AÇÃO 1: WhatsApp
+        if partes.get("UBER") and partes.get("UBER") != "NENHUM":
+            contexto_extra += calcular_estimativa_transporte(partes.get("UBER"))
+            
         if partes.get("WHATSAPP") == "ENVIAR" and partes.get("PARA") != "NENHUM":
             supabase.table("whatsapp_comandos").insert({"destinatario": partes.get("PARA"), "mensagem": partes.get("TXT")}).execute()
-            contexto_extra += f" [SISTEMA: A mensagem para {partes.get('PARA')} foi enviada.]"
+            contexto_extra += f" [SISTEMA: Mensagem enviada para {partes.get('PARA')}.]"
             
-        # AÇÃO 2: GPS e Mapas
-        if partes.get("LOCAL") and partes.get("LOCAL") != "NENHUM":
-            contexto_extra += consultar_mapa_manaus(partes.get("LOCAL"))
-            
-        # AÇÃO 3: Pesquisa no Google/DuckDuckGo
         if partes.get("BUSCA") and partes.get("BUSCA") != "NENHUM":
             contexto_extra += buscar_na_internet(partes.get("BUSCA"))
                 
     except Exception as e:
         print(f"[ERRO PARSER] {e}", file=sys.stderr)
 
-    # PROMPT DE PERSONALIDADE (70B)
     prompt_sistema = (
-        "Você é o assistente avançado do ecossistema Arbo. O ano é 2026. "
-        "Você opera de Manaus, Amazonas, e tem profundo conhecimento da cidade. "
-        "Se o usuário fizer uma pergunta e o contexto trouxer dados da 'Internet Real-Time' ou 'Mapa', "
-        "use essas informações para dar uma resposta inteligente e atualizada, mas com suas próprias palavras. "
-        "Aja de forma muito natural, parecendo um humano conversando. Seja ultra direto, sem enrolação (máximo 2 frases curtas). "
-        "Se não souber algo, diga a verdade."
+        "Você é uma inteligência artificial avançada operando em formato de chamada telefônica. O ano é 2026. "
+        "Você está localizada em Manaus, Amazonas. Se o contexto contiver dados de 'Transporte', use essas informações "
+        "para informar o preço estimado da corrida e a distância de forma natural, arredondando os valores para soar humano. "
+        "Seja extremamente direto, claro e responda em no máximo duas frases curtas."
     )
 
     try:
@@ -191,20 +219,17 @@ def process():
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": prompt_sistema},
-                {"role": "user", "content": f"O que o usuário falou: '{user_speech}'. Dados do sistema: {contexto_extra}"}
+                {"role": "user", "content": f"Fala do usuário: '{user_speech}'. Dados injetados pelo sistema: {contexto_extra}"}
             ],
             temperature=0.4,
             max_tokens=150
         )
         ia_resposta = completion.choices[0].message.content
     except Exception:
-        ia_resposta = "Tive um pequeno atraso de conexão. Pode repetir?"
+        ia_resposta = "Houve uma oscilação na rede. Pode repetir?"
 
     return responder_usuario(provedor, ia_resposta)
 
-# =====================================================================
-# FUNÇÕES AUXILIARES DE ADAPTAÇÃO DE SINAL
-# =====================================================================
 def reabrir_microfone(provedor):
     if provedor == 'vonage': return jsonify([{"action": "input", "type": ["speech"], "speech": {"language": "pt-BR"}, "eventUrl": ["https://twilo-eqee.onrender.com/process?provider=vonage"]}]), 200
     r = VoiceResponse(); r.gather(input='speech', action='https://twilo-eqee.onrender.com/process?provider=twilio', language='pt-BR'); return str(r), 200, {'Content-Type': 'text/xml'}
@@ -216,3 +241,19 @@ def encerrar_chamada(provedor):
 def responder_usuario(provedor, texto):
     if provedor == 'vonage': return jsonify([{"action": "talk", "text": texto, "language": "pt-BR", "bargeIn": True}, {"action": "input", "type": ["speech"], "speech": {"language": "pt-BR", "endOnSilence": 1.5}, "eventUrl": ["https://twilo-eqee.onrender.com/process?provider=vonage"]}]), 200
     r = VoiceResponse(); g = r.gather(input='speech', action='https://twilo-eqee.onrender.com/process?provider=twilio', language='pt-BR'); g.say(texto, language='pt-BR', voice="Polly.Vitoria"); return str(r), 200, {'Content-Type': 'text/xml'}
+
+# =====================================================================
+# LOOP SÍNCRONO EM SEGUNDO PLANO (THREAD AUTOMÁTICA)
+# =====================================================================
+def loop_de_ligacoes():
+    while ATIVAR_LIGACOES_AUTOMATICAS:
+        disparar_ligacao_assistente()
+        # O sleep agora calcula o intervalo com base nos 2 minutos configurados
+        time.sleep(INTERVALO_MINUTOS * 60)
+
+# Dispara a Thread em paralelo para o Flask rodar sem travar a porta 5000
+if ATIVAR_LIGACOES_AUTOMATICAS:
+    threading.Thread(target=loop_de_ligacoes, daemon=True).start()
+
+if __name__ == "__main__":
+    app.run(port=5000, debug=True)
