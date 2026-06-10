@@ -1,7 +1,9 @@
 flask
 twilio
 groq
-gunicorn
 requests
-duckduckgo_search
+duckduckgo-search
 supabase
+vonage
+python-dotenv
+gunicorn
