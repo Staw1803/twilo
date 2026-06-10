@@ -21,15 +21,14 @@ INTERVALO_MINUTOS = 2              # Tempo entre o fim de uma chamada e o dispar
 TIMEOUT_SEGUNDOS = 7               # Janela estrita de 7 segundos para evitar a caixa postal
 
 # --- TWILIO ---
-TWILIO_SID = 'ACa290536a8629089fbebd1d00faa9f605'
-TWILIO_TOKEN = '6c3ad2e75dc26d1ac377d4cf09c3056f'
+
+
 NUMERO_TWILIO = '+16189964461'
 MEU_NUMERO_CELULAR = '5592981233982'
 
 # --- VONAGE ---
-VONAGE_API_SECRET = 'p6t3q(TNAsWE!r8q'
-VONAGE_APP_ID = 'b90f5a80-e2f2-405d-a69d-a31e4407206a' 
-VONAGE_NUMERO_ORIGEM = '12345678901'
+
+
 
 VONAGE_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDWwewScbUl0rDj
@@ -61,9 +60,8 @@ y6DuGldnMmCOdpXpm3Umc99O
 -----END PRIVATE KEY-----"""
 
 # --- GROQ & SUPABASE ---
-GROQ_API_KEY = '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'
+
 SUPABASE_URL = 'https://gzekubsjpcgrxgomoriy.supabase.co'
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6ZWt1YnNqcGNncnhnb21vcml5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzA3NDgsImV4cCI6MjA5NjQ0Njc0OH0.AxMl-aczglJgazwCyMZtQc191vVGjxhSiR98jUmBdAU'
 
 # =====================================================================
 # INICIALIZAÇÃO E FERRAMENTAS DE INTELIGÊNCIA
